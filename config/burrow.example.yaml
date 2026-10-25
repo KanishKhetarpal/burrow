@@ -1,0 +1,85 @@
+# Burrow agent config — installed to C:\ProgramData\Burrow\burrow.yaml by setup Phase 7.
+# Setup fills every <PLACEHOLDER>. The agent refuses to start if validation fails (see docs/04-API.md §10).
+
+owner:
+  tailscale_login: "<OWNER_TAILSCALE_LOGIN>"   # e.g. the email/login on the tailnet
+
+device:
+  # Filled at pairing. Only these Tailscale nodes may reach Burrow.
+  allowed:
+    # - { name: "iPhone", kind: "phone",  node_id: "<StableID>" }
+    # - { name: "Laptop", kind: "laptop", node_id: "<StableID>" }
+  max_devices: 3                # iPhone, laptop, one spare slot
+
+agent:
+  hostname: "n-<random8>"       # random, non-identifying (appears in public CT logs as <hostname>.<tailnet>.ts.net)
+  state_dir: 'C:\ProgramData\Burrow\state'
+  tsnet_logs_upload: false      # sets TS_NO_LOGS_NO_SUPPORT=true
+  auth:
+    session_idle_minutes: 30
+    session_absolute_hours: 12
+    stepup_seconds: 300
+    login_max_failures: 5
+    lockout_minutes: 15
+    pairing_window_minutes: 10
+
+claude:
+  binary: "claude"              # resolved from PATH of the owner's account
+  git_bash_path: 'C:\Program Files\Git\bin\bash.exe'
+  default_mode: "chat"          # chat | server
+  default_permission_mode: "default"   # default | acceptEdits | plan  (bypassPermissions is never allowed)
+  server_spawn: "same-dir"      # same-dir | worktree
+  server_capacity: 8
+  max_sessions: 6
+  restricted_token: true        # children run with Administrators as deny-only
+  ready_timeout_seconds: 30
+  scrollback_bytes: 2097152
+
+projects_parents:               # where new projects may be added from the app
+  - 'D:\code'
+
+projects:
+  - name: "demo-app"
+    path: 'D:\code\demo-app'
+  - name: "scratch"
+    path: 'D:\code\scratch'
+
+files:
+  roots:
+    - { name: "Desktop",   path: 'C:\Users\<user>\Desktop',   writable: true }
+    - { name: "Documents", path: 'C:\Users\<user>\Documents', writable: true }
+    - { name: "Downloads", path: 'C:\Users\<user>\Downloads', writable: true }
+    - { name: "Pictures",  path: 'C:\Users\<user>\Pictures',  writable: false }
+    - { name: "Code",      path: 'D:\code',                   writable: true }
+  upload_default_root: "Downloads"
+  max_upload_mb: 2048
+  extra_denylist: []            # added to the built-in denylist (docs/03-SECURITY.md §4)
+
+wake:
+  method: "smartplug"           # v1: smartplug | (future) waker | router | none
+  shortcuts:                    # iOS Shortcuts names, must match exactly on the iPhone
+    on: "PC On"                 # plug on → BIOS AC restore boots the PC
+    off: "PC Off"               # offered only after a confirmed Burrow shutdown
+    power_cycle: "PC Power Cycle"   # off → wait 15 s → on; behind a warning
+  wake_timeout_seconds: 180
+  power_cycle_after_seconds: 90
+  off_confirm_seconds: 30       # /healthz must fail continuously this long before offering "PC Off"
+  waker_url: ""                 # only for method: waker
+  router_hint: ""
+
+power:
+  keep_awake_while_sessions: true
+  auto_shutdown_idle_minutes: 0 # 0 = off; idle = no sessions, no app activity, no SSH/SMB sessions
+
+ssh:
+  user: "<windows-username>"    # used for the ssh:// link that opens Termius
+  host: "<pc-magicdns-name>"
+
+audit:
+  path: 'C:\ProgramData\Burrow\audit\audit.jsonl'
+
+logging:
+  dir: 'C:\ProgramData\Burrow\logs'
+  level: "info"
+  max_files: 10
+  max_size_mb: 10

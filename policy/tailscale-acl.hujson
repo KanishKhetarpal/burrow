@@ -1,0 +1,71 @@
+// Burrow — Tailscale policy template.
+// Setup fills the <PLACEHOLDERS>, validates via the API (/acl/validate), then applies.
+// Default-deny: anything not listed below is blocked.
+// Allowed client devices: your iPhone and your laptop. Nothing else.
+// Claude Code: check current Tailscale policy syntax docs before applying; keep the intent identical.
+{
+  "tagOwners": {
+    "tag:pc":           ["autogroup:admin"],
+    "tag:burrow-agent": ["autogroup:admin"],
+    "tag:burrow-waker": ["autogroup:admin"],   // reserved for a future Raspberry Pi waker
+  },
+
+  "hosts": {
+    // Tailnet IPs recorded in setup Phase 4.
+    "owner-iphone": "<PHONE_TAILNET_IP>",
+    "owner-laptop": "<LAPTOP_TAILNET_IP>",
+  },
+
+  "acls": [
+    // iPhone + laptop → Burrow agent (web app / API over HTTPS)
+    {"action": "accept", "src": ["owner-iphone", "owner-laptop"], "dst": ["tag:burrow-agent:443"]},
+
+    // iPhone + laptop → PC: SSH (Termius / terminal / VS Code) and SMB (Files app / mapped drives)
+    {"action": "accept", "src": ["owner-iphone", "owner-laptop"], "dst": ["tag:pc:22,445"]},
+
+    // Laptop → PC remote desktop (Phase 5.4). Setup keeps exactly ONE of these, or none:
+    // <RDP_RULE>      {"action": "accept", "src": ["owner-laptop"], "dst": ["tag:pc:3389"]},
+    // <SUNSHINE_RULE> {"action": "accept", "src": ["owner-laptop"], "dst": ["tag:pc:<SUNSHINE_PORTS>"]},
+
+    // Future waker (unused in v1, harmless): iPhone → waker, waker → agent health.
+    {"action": "accept", "src": ["owner-iphone"], "dst": ["tag:burrow-waker:443"]},
+    {"action": "accept", "src": ["tag:burrow-waker"], "dst": ["tag:burrow-agent:443"]},
+
+    // OPTIONAL (Phase 0, Q5): keep your other personal (untagged) devices able to reach each other.
+    // Tagged Burrow nodes are NOT covered by autogroup:self, so they stay iPhone+laptop-only.
+    // <AUTOGROUP_SELF_RULE> {"action": "accept", "src": ["autogroup:member"], "dst": ["autogroup:self:*"]},
+  ],
+
+  // Tailscale SSH is not used (Windows OpenSSH is used instead).
+  "ssh": [],
+
+  // No "nodeAttrs" granting "funnel": Funnel stays impossible.
+
+  // Policy tests: Tailscale rejects the policy if any of these fail.
+  // Setup adds "tag:pc:3389" (RDP) or the Sunshine ports to the laptop's accept list and the iPhone's deny list when remote desktop is enabled.
+  "tests": [
+    {
+      "src":    "owner-iphone",
+      "accept": ["tag:burrow-agent:443", "tag:pc:22", "tag:pc:445"],
+      "deny":   ["tag:pc:3389", "tag:pc:5985", "tag:pc:80", "tag:burrow-agent:80", "tag:burrow-agent:22"],
+    },
+    {
+      "src":    "owner-laptop",
+      "accept": ["tag:burrow-agent:443", "tag:pc:22", "tag:pc:445"],
+      "deny":   ["tag:pc:5985", "tag:pc:80", "tag:burrow-agent:80", "tag:burrow-agent:22", "tag:burrow-waker:443"],
+    },
+    {
+      "src":    "tag:burrow-waker",
+      "accept": ["tag:burrow-agent:443"],
+      "deny":   ["tag:pc:22", "tag:pc:445", "owner-iphone:443", "owner-laptop:22"],
+    },
+    {
+      "src":    "tag:pc",
+      "deny":   ["owner-iphone:443", "owner-laptop:22", "owner-laptop:445", "tag:burrow-agent:443"],
+    },
+    {
+      "src":    "tag:burrow-agent",
+      "deny":   ["tag:pc:22", "tag:pc:445", "owner-iphone:443", "owner-laptop:22"],
+    },
+  ],
+}

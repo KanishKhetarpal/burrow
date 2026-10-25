@@ -1,0 +1,65 @@
+# systemd unit for the Burrow waker.
+#
+# Not used by v1: Burrow wakes the PC with a smart plug, which needs no extra
+# computer. This exists so a Raspberry Pi can be added later by switching
+# wake.method to "waker" (docs/02-ARCHITECTURE.md D7).
+#
+# The hardening below is deliberate. This service sits on a device that is
+# powered on all the time and reachable from the tailnet, so it gets as little
+# of the system as it can function with.
+
+[Unit]
+Description=Burrow waker
+Documentation=https://github.com/burrow/docs/02-ARCHITECTURE.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/burrow-waker -config /etc/burrow-waker/waker.yaml
+Restart=always
+RestartSec=5
+
+# A system user created per-boot, owning nothing on disk.
+DynamicUser=yes
+# StateDirectory gives it /var/lib/burrow-waker for the tsnet node keys, which
+# is the only state it needs.
+StateDirectory=burrow-waker
+StateDirectoryMode=0700
+
+# No path to becoming root, even through a setuid binary.
+NoNewPrivileges=yes
+# The filesystem is read-only apart from the state directory.
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+
+# It needs a tailnet connection and a UDP broadcast for the magic packet, and
+# nothing else.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK AF_UNIX
+# Broadcast is the one capability a plain user process lacks here.
+AmbientCapabilities=CAP_NET_BROADCAST
+CapabilityBoundingSet=CAP_NET_BROADCAST
+
+# The config holds the phone's node id and the PC's MAC: not secret, but not
+# everyone's business either.
+ReadOnlyPaths=/etc/burrow-waker
+
+[Install]
+WantedBy=multi-user.target
